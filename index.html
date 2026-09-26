@@ -789,9 +789,10 @@
   <header class="studio-bar">
     <button id="ed-back" class="studio-nav">← 返回</button>
     <div class="studio-brand">🛠 创造模式<span id="ed-crumb">关卡管理器</span></div>
-    <!-- 2.4.40（用户定版）：**撤回/重做不再挂在顶栏** —— 它们各有作用域：
-         「编辑盒子」里那组只管**这个盒子空间**的改动；「编辑关卡」里那组管**一个盒子的整体改动** ✓ -->
-    <label class="studio-name hidden" id="ed-name-wrap">关卡名 <input id="ed-name" type="text" maxlength="24" placeholder="未命名关卡"></label>
+    <!-- 2.4.40（用户定版）：**撤回/重做不挂在顶栏** —— 它们各有作用域：
+         「编辑盒子」里那组只管**这个盒子空间**的改动；「编辑关卡」里那组管**一个盒子的整体改动** ✓
+         2.4.42（用户定版）：**顶栏的"关卡名"输入框已删除** —— 名字只在「初始化关卡」里定、
+         「重命名」里改（都在关卡管理器里），编辑关卡时只**显示**（面包屑 / 卡片），不再就地编辑 ✓ -->
   </header>
   <div class="studio-msg" id="ed-msg"></div>
 
@@ -814,6 +815,8 @@
       <h2>本地关卡</h2>
       <div id="ed-levels" class="ed-list"></div>
     </div>
+    <!-- 2.4.42：共享关卡**读不到时给出可见原因**（原来静默隐藏 ⇒ 用户以为功能坏了 ✗）-->
+    <div id="ed-shared-hint" class="studio-msg"></div>
     <!-- 2.4.41：**共享关卡**（随仓库发布的那一批，见 levels/index.json）——
          没这份清单时整块隐藏（file:// 直接打开、或还没发布过共享关卡）✓ -->
     <div class="studio-box hidden" id="ed-shared-box">
@@ -1955,7 +1958,7 @@ const ED={ tool:'wall', spaces:{}, ac:{space:null,cell:null}, goal:null, draft:n
            initKind:'new', initName:'', initN:7,
            playFrom:'manager',      /* 游玩关卡从哪来 ⇒ 结束试玩回哪去 ✓ */
            playKind:'playtest',     /* playtest（编辑器里试玩）| play（管理器里游玩）—— 提示语不同 ✓ */
-           shared:[], sharedState:'idle' };  /* 2.4.41 共享关卡（随仓库发布的那一批）✓ */
+           shared:[], sharedState:'idle', sharedError:'' };  /* 2.4.41/2.4.42 共享关卡（随仓库发布）✓ */
 function edLoadLib(){ try{ ED.lib=JSON.parse(localStorage.getItem(ED_KEY)||'{}')||{}; }catch(e){ ED.lib={}; } }
 function edSaveLib(){ try{ localStorage.setItem(ED_KEY,JSON.stringify(ED.lib)); return true; }catch(e){ return false; } }
 
@@ -2074,8 +2077,6 @@ function edShow(which){
     : which==='main' ? ('编辑关卡 · '+ED.name)
     : which==='space' ? ('编辑盒子 · '+(ED.draft?ED.draft.id+'ms':''))
     : '创造模式';
-  const nw=$('#ed-name-wrap');                 /* 关卡名输入框只在"编辑"屏露面（顶栏）✓ */
-  if(nw) nw.classList.toggle('hidden', which!=='main');
 }
 /* ================= 2.4.31（用户定版）· 先定盒子大小 =================
  * 用户：「在点击创造模式后，先确定盒子的大小（应该为一个不小于5的正奇数，不合法的输入应该被拦截，
@@ -2218,7 +2219,7 @@ function edGoalReach(){
 }
 /* —— 主界面 —— */
 function edRenderMain(){
-  const nm=$('#ed-name'); if(nm) nm.value=ED.name||'';
+  /* 2.4.42：顶栏那个"关卡名"输入框已删 —— 本屏只显示（面包屑里有名字）✓ */
   const box=$('#ed-list'); if(!box) return;
   resetEl(box);
   const ids=Object.keys(ED.spaces).map(Number).sort((a,b)=>a-b);
@@ -2549,7 +2550,6 @@ function edLoadLevelIntoED(name){
   ED.n=edSizeOk(L.n)||7;
   ED.draft=null;
   edNormalizeAC();
-  const nm=$('#ed-name'); if(nm) nm.value=ED.name;
   return true;
 }
 function edOpenManager(){
@@ -2567,6 +2567,9 @@ function edRenderSelInfo(){
 function edRenderManager(){
   const box=$('#ed-levels'); if(!box) return;
   resetEl(box);
+  /* 2.4.42：共享关卡读不到时，**在管理器里显示一行原因**（原来是静默隐藏 ⇒ 用户以为功能没做 ✗）*/
+  const hint=$('#ed-shared-hint');
+  if(hint) hint.textContent=(ED.sharedState==='ok')?'':(ED.sharedError||'');
   const names=Object.keys(ED.lib).sort((a,b)=>String(a).localeCompare(String(b),'zh'));
   const head=document.createElement('div');
   head.innerHTML='<b>'+names.length+' 个本地关卡</b>';   /* 用户第 6 条：删掉那两行说明 ✓ */
@@ -2651,7 +2654,7 @@ function edInitGo(){
           const keep=JSON.parse(JSON.stringify(ED.lib[from]||{}));
           delete ED.lib[from]; ED.lib[name]=keep; ED.lib[name].name=name;
           if(ED.savedAs===from) ED.savedAs=name;
-          edSaveLib(); if(ED.name===from){ ED.name=name; const e=$('#ed-name'); if(e) e.value=name; }
+          edSaveLib(); if(ED.name===from) ED.name=name;      /* 2.4.42：没有输入框了，直接改 ED.name ✓ */
           edShow('main'); edRenderMain(); edMsg('已重命名为「'+name+'」（覆盖了同名关卡）');
         }},
         {label:'换个名字', fn:()=>{ edOpenInit('rename', from); edMsg('换个名字'); }},
@@ -2663,7 +2666,7 @@ function edInitGo(){
     delete ED.lib[from]; ED.lib[name]=keep; ED.lib[name].name=name;
     if(ED.savedAs===from) ED.savedAs=name;
     edSaveLib();
-    if(ED.name===from){ ED.name=name; const e=$('#ed-name'); if(e) e.value=name; }
+    if(ED.name===from) ED.name=name;                 /* 2.4.42：同上，直接改 ED.name ✓ */
     edShow('main'); edRenderMain();
     edMsg('已重命名为「'+name+'」');
     return;
@@ -2701,6 +2704,54 @@ function edInitGo(){
  *   —— 也接受 `[…数组]` 与单个关卡对象；解析后**统一转成编辑器内部格式**再进内存 ✓
  */
 const ED_SHARED_URL='levels/index.json';
+/* 2.4.42：清单可以写成三种形式（都支持）——
+ *   ① 一个包：`{format,version,levels:[<关卡>…]}`（= 我们「导出」出来的东西，直接贴进来即可 ✓）
+ *   ② **只列文件名**：`{files:["钥匙.json", …]}` 或 `["钥匙.json", …]`
+ *      ⇒ 页面会去 `levels/<文件名>` 逐个拉取（关卡文件保持独立、index.json 只有几行 ✓）
+ *   ③ 直接是一个关卡对象 ✓
+ * ⚠ 为什么必须有这个清单：静态托管（含 GitHub Pages）**没有"目录列表"接口** ⇒ 不列出来就没法发现新文件 ✗
+ *   （用户 2026-09-26 报例：把 levels 里的文件换成「钥匙.json」后共享关卡不出现 —— 就是 index.json 被一起删掉了 ✗）*/
+function edSharedError(msg){ ED.sharedError=msg||''; }
+async function edLoadShared(force){
+  if(ED.sharedState==='loading') return;
+  if(ED.sharedState==='ok'&&!force) return;
+  ED.sharedState='loading';
+  edSharedError('');
+  const base=ED_SHARED_URL.replace(/[^/]*$/,'');       /* 'levels/' ✓ */
+  try{
+    const r=await fetch(ED_SHARED_URL,{cache:'no-store'});
+    if(!r.ok) throw new Error('HTTP '+r.status);
+    const txt=await r.text();
+    let raw=null;
+    try{ raw=JSON.parse(txt); }catch(e){ throw new Error('清单不是合法 JSON'); }
+    /* ② 只列文件名 ⇒ 逐个拉 ✓ */
+    const fileList=Array.isArray(raw)?raw.filter(x=>typeof x==='string')
+      :(raw&&Array.isArray(raw.files)?raw.files.filter(x=>typeof x==='string'):null);
+    if(fileList){
+      const got=[];
+      for(const f of fileList){
+        try{
+          const rr=await fetch(base+String(f).replace(/^\/+/,''),{cache:'no-store'});
+          if(rr.ok) got.push(await rr.text());
+        }catch(e){/* 单个文件读不到就跳过，不让整块崩 ✗→✓ */}
+      }
+      if(!got.length) throw new Error('清单里列的关卡文件都读不到（'+fileList.join('、')+'）');
+      ED.shared=edParseLevels('['+got.join(',')+']');
+    }else{
+      ED.shared=edParseLevels(txt);
+    }
+    if(!ED.shared.length) throw new Error('清单里没有解析出任何关卡');
+    ED.sharedState='ok';
+  }catch(e){
+    ED.shared=[]; ED.sharedState='none';
+    const isFile=(typeof location!=='undefined'&&location.protocol==='file:');
+    edSharedError(isFile
+      ? '共享关卡要在 http(s) 下才读得到（当前是 file:// 直接打开，浏览器不允许读本地文件）'
+      : ('读不到 '+ED_SHARED_URL+'：'+e.message));
+  }
+  edRenderShared();
+  if(ED.sharedState!=='ok'&&ED.screen==='manager') edRenderManager();   /* 让提示行出现在管理器里 ✓ */
+}
 function edRenderShared(){
   const box=$('#ed-shared'), wrap=$('#ed-shared-box');
   if(!box||!wrap) return;
@@ -2726,20 +2777,6 @@ function edRenderShared(){
     row.appendChild(mk('复制到本地','ed-tab',()=>edCopyShared(L.name)));
     box.appendChild(row);
   });
-}
-async function edLoadShared(force){
-  if(ED.sharedState==='loading') return;
-  if(ED.sharedState==='ok'&&!force) return;
-  ED.sharedState='loading';
-  try{
-    const r=await fetch(ED_SHARED_URL,{cache:'no-store'});
-    if(!r.ok) throw new Error('HTTP '+r.status);
-    const list=edParseLevels(await r.text());
-    ED.shared=list; ED.sharedState='ok';
-  }catch(e){
-    ED.shared=[]; ED.sharedState='none';      /* 没有这份清单 ⇒ 整块不显示 ✓ */
-  }
-  edRenderShared();
 }
 function edSharedGet(name){ return (ED.shared||[]).filter(l=>l.name===name)[0]||null; }
 function edCopyShared(name){
@@ -2896,7 +2933,8 @@ function edWire(){
  * （2.4.23 那版是"改名就顺手把旧槽删掉"，用户改主意了：不许静默覆盖 ✓）
  */
 function edSaveToLocal(){
-  const nm=$('#ed-name'); ED.name=((nm&&nm.value)||'未命名关卡').trim()||'未命名关卡';
+  /* 2.4.42：顶栏那个"关卡名"输入框已删 ⇒ 名字就是 `ED.name`（由初始化/重命名定下）✓ */
+  ED.name=edLevelName(ED.name)||'未命名关卡';
   const exists=!!ED.lib[ED.name];
   const isSelf=(ED.savedAs===ED.name);           /* 就是本次会话自己的槽（原样再存一次）*/
   if(!exists){ edDoSave(); edMsg('已保存「'+ED.name+'」'); return; }
@@ -2908,14 +2946,13 @@ function edSaveToLocal(){
       let i=2, base=ED.name;
       while(ED.lib[base+' ('+i+')']) i++;
       ED.name=base+' ('+i+')';
-      const el=$('#ed-name'); if(el) el.value=ED.name;
       edDoSave(); edMsg('已另存为「'+ED.name+'」');
     }},
     {label:'取消', fn:()=>edMsg('已取消保存')},
   ]);
 }
 function edDoSave(){
-  const nm=$('#ed-name'); ED.name=((nm&&nm.value)||'未命名关卡').trim()||'未命名关卡';
+  ED.name=edLevelName(ED.name)||'未命名关卡';
   const before=edStateOf();
   ED.lib[ED.name]={name:ED.name,n:ED.n,spaces:JSON.parse(JSON.stringify(ED.spaces)),ac:JSON.parse(JSON.stringify(ED.ac)),goal:ED.goal};
   ED.savedAs=ED.name;
@@ -3056,11 +3093,8 @@ function edDoSave(){
   on('ed-save',()=>edSaveToLocal());
   on('ed-export',()=>{
     try{
-      /* 2.4.36（用户报例②）：「修改关卡名后，点击"导出整关"，名字没有改」
-       *   根因：`ED.name` 只在"保存到本地"里才从输入框读回来 ⇒ 导出用的是**旧名字** ✗
-       *   导出前先把输入框的名字读进 ED.name（与保存同一套规则）✓ */
-      const nmEl=$('#ed-name');
-      if(nmEl) ED.name=((nmEl.value||'').trim())||ED.name||'未命名关卡';
+      /* 2.4.36 报例②（"改了名字导出还是旧名字"）的根因当时是"名字只在保存时才从输入框读回"；
+         2.4.42 起顶栏那个输入框已删 ⇒ `ED.name` 就是唯一来源，这个问题从设计上消失了 ✓ */
       const a=document.createElement('a');
       a.href='data:application/json;charset=utf-8,'+encodeURIComponent(edLevelJson());
       a.download=(ED.name||'level')+'.json';
