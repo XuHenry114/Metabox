@@ -118,12 +118,9 @@
   /* 2.4.22 修复（用户报例）：进入冒险模式后**没有回开始界面的路** ✗ ⇒ 顶栏加一颗「主菜单」✓ */
   #btn-home{font-size:12px;padding:6px 10px;border-radius:8px;background:var(--panel2);border:1px solid var(--line);color:#cfe0ff;cursor:pointer;white-space:nowrap}
   #btn-home:hover{background:#22355c;border-color:#34518a}
-  #crumbs{
-    flex-basis:100%;font-size:12px;color:var(--muted);
-    font-family:ui-monospace,Consolas,monospace;display:flex;align-items:center;gap:6px;flex-wrap:wrap;
-  }
-  #crumbs i{color:#3d5480;font-style:normal}
-  #crumbs .cur{color:var(--accent);font-weight:700}
+  /* 2.4.47（用户定版）：顶栏的「空间路径面包屑」(`1ms › 2ms › 3ms › 5ms › 6ms …`) 已**整段删除** ——
+   *   有了「查看视图」就不需要它了；**游玩/试玩界面都不再显示**这排路径 ✓
+   *   （守卫 `dev/ui-layout-scroll-guard.js` 钉住"别写回来"；当前空间仍由 `#cur-box`/`#view-name` 显示 ✓）*/
   #data-warn,#browse-warn{
     display:flex;align-items:center;gap:10px;flex-wrap:wrap;
     padding:8px 18px;font-size:12.5px;color:#ffe3a1;
@@ -234,8 +231,16 @@
    *     · 列布局 + 子元素靠上 ⇒ **棋盘位置一像素都不动**（stage 仍是 213..722）✓
    *     · 外扩那 4px 仍然完整可见、可点（**不裁剪**，与 v2.3.1 的设计一致）✓
    *     · 只是不再算作溢出 ⇒ 装得下时没有滚动条，装不下时（大边长）照旧可滚 ✓
-   *   ⚠ 别再改回 `overflow:auto` 却去掉这个 padding —— 那样滚动条会立刻回来 ✗ */
-  #board-area{overflow:auto;padding-bottom:6px}
+   *   ⚠ 别再改回 `overflow:auto` 却去掉这个 padding —— 那样滚动条会立刻回来 ✗
+   * 2.4.43（用户定版）：「给当前视图在**必要时**加上纵向滑动条，以免视图太大时整个页面过长」——
+   *   `--board-max` 由 `fitBoardArea()` **实测**写入（= 这个位置往下还剩多少视口高度，不猜顶栏多高 ✓）：
+   *     · 装得下的棋盘：max-height 比内容还大 ⇒ **一个滚动条都不会多**（上面那条修复照旧 ✓）
+   *     · 装不下的棋盘（13×13 / 15×15 那种）：只让**棋盘区自己**竖着滚，页面不再被顶长 ✓
+   * 2.4.44（用户定版）：「把纵向与横向的阈值**统一**（边长为 11 时同时出现），保证视图是一个正方形」——
+   *   ⇒ `max-width` 也吃**同一个** `--board-max`：可视区 = 边长 min(横向可用, 纵向可用) 的**正方形** ✓
+   *     棋盘本身是正方形 ⇒ 它一旦装不下，就是**两个方向同时**装不下 ⇒ 两条滚动条必然同进同出 ✓
+   *     （改之前：横向可用 ≈748、纵向可用 ≈684 ⇒ 中间夹着一条"只出竖条"的带宽 ✗）*/
+  #board-area{overflow:auto;padding-bottom:6px;max-height:var(--board-max,none);max-width:var(--board-max,none)}
   /* 进入：父空间 1→3 放大模糊淡出 → 目标空间 0.3→1 淡入；退出相反 */
   #stage.zoom-enter-out{animation:zoomEnterOut .22s ease-in forwards}
   @keyframes zoomEnterOut{to{transform:scale(3);opacity:0;filter:blur(6px)}}
@@ -678,7 +683,6 @@
       <span class="jump-lab">跳转</span>
       <div id="jump-pad"></div>
     </div>
-    <div id="crumbs"></div>
     <div id="data-warn" class="hidden">
       <span>⚠️ 关卡数据未就绪：当前使用<b>内置占位数据</b>（演示空间）渲染，可正常试玩；数据文件就绪后重新加载即生效。</span>
       <button id="data-warn-reload">重试加载数据</button>
@@ -1571,6 +1575,64 @@ function updateViewBadge(vs){
   const ring=$('#view-ring');
   if(ring) $$('.ring-zone',ring).forEach(z=>{ z.dataset.canExit=(vs&&vs.canExit)?'1':'0'; });
 }
+/* —— 2.4.43 + 2.4.44（用户定版）：「必要时给视图加滚动条，别让整页变长」+
+ *    「纵向与横向的阈值**统一**（边长为 11 时同时出现），保证视图是一个正方形」——
+ * 做法：算出「这个位置往下还剩多少视口高度」与「横向还剩多少」，取**较小者**当正方形边长，
+ *   写进 `--board-max`（CSS 里 max-height / max-width 都吃它 ✓）：
+ *   · 棋盘是正方形 ⇒ 边长超过这个正方形边长时，**两个方向同时**超出 ⇒ 两条滚动条同进同出 ✓
+ *   · 装得下 ⇒ 两个值都比内容大 ⇒ **一根都不多** ✓
+ * ⚠ 量宽度前先把上一次的约束摘掉（`'none'`）—— 否则量到的是"被压过之后"的宽度，会越量越小 ✗
+ * ⚠ **只在"真的装不下"时才收敛成正方形**：装得下就写 `none` ⇒ 容器保持原来的自然尺寸，
+ *   棋盘位置一像素都不动（否则冒险模式那种"本来正好"的棋盘会被无谓地压窄、棋盘左移 ✗）*/
+function fitBoardArea(){
+  const area=$('#board-area'); if(!area||!area.style) return;
+  try{
+    const setVar=(v)=>{ try{ if(typeof area.style.setProperty==='function') area.style.setProperty('--board-max',v); else area.style['--board-max']=v; }catch(e){} };
+    /* 2.4.48（用户报例）：「每移动一步，大关卡的**纵向**滑动条都会回到顶端（横向没事）」——
+     *   真凶就是下面这行 `setVar('none')`：
+     *     · 摘掉 `--board-max` ⇒ `#board-area` 的 **max-height/max-width 都没了**
+     *     · 而**高度**能被内容顶开（父级不限高，页面自己会滚）⇒ 容器当场长到 965、比内容还高
+     *       ⇒ **纵向滚动范围变成 0 ⇒ 浏览器把 scrollTop 钳成 0**（钳位不可逆，量完再写回 `723px` 也不会还原 ✗）
+     *     · **宽度**顶不开（父级 `#layout` 是定宽 flex ⇒ 容器宽就那么大）⇒ clientWidth 不变
+     *       ⇒ **横向 scrollLeft 毫发无伤** ✓
+     *     —— 这就是"纵向回顶、横向很好"的全部来由 ✓（每一步都会 `renderGrid` → 末尾调本函数 ⇒ 每步都跳 ✗）
+     *   实测证据（`dev/_diag-scroll-jump.js`）：给 `scrollTop` 装 setter 探针**一次 JS 写入都没抓到**；
+     *   `overflow-anchor:none` 无效；手动 `#stage{transform:scale(.3)}` 也不会钳位；
+     *   只有"容器被顶高"这一条能解释 ⇒ 量尺寸期间**必须端住视口** ✓
+     *   （另一条错路：以为是把旧格子清空导致高度塌 —— 已顺带改成"先追加新的再删旧的"，但那不是真凶）*/
+    const keepTop=area.scrollTop||0, keepLeft=area.scrollLeft||0;
+    setVar('none');                                   /* 先松开，量自然尺寸 ✓ */
+    let top=0, natW=0, needW=0, needH=0;
+    try{
+      const r=area.getBoundingClientRect?area.getBoundingClientRect():null;
+      if(r){ top=r.top||0; natW=r.width||0; }
+      /* ⚠ 「内容多大」要量 **#stage** 的**布局尺寸**（`offsetWidth/offsetHeight`）——
+       *   ① 不能用 `area.scrollWidth/scrollHeight`：它们会被**夹到容器尺寸** ⇒ 装得下的棋盘
+       *      也会等于容器宽（766）⇒ 被误判成"需要滚动"，白白把容器压窄 ✗（实测抓到的）
+       *   ② 也不能用 `getBoundingClientRect()`：**它包含 transform** ⇒ 进盒那一步整屏缩放动画
+       *      刚开始（scale .3）时量到的是缩小后的尺寸 ⇒ 误判"装得下" ⇒ **纵向滚动条当场消失** ✗
+       *      （2.4.45 用户 2026-09-26 报例：bug.json 连按 5 次 w 进入 0B 那一步，纵条不见了 —— 已复现并修掉 ✓）*/
+      const stage=$('#stage');
+      if(stage){
+        needW=stage.offsetWidth||0; needH=stage.offsetHeight||0;
+        if(!needW&&stage.getBoundingClientRect){ const sr=stage.getBoundingClientRect(); needW=sr.width||0; needH=sr.height||0; }
+      }
+    }catch(e){}
+    if(!natW) natW=area.clientWidth||760;
+    const vh=(typeof window!=='undefined'&&window.innerHeight)?window.innerHeight:800;
+    const hAvail=Math.floor(vh-top-40);               /* 底部留：`#layout` 下内边距(24) + 呼吸 ✓ */
+    const side=Math.max(220, Math.min(Math.floor(natW), hAvail));   /* 两个方向统一 ⇒ 正方形 ✓ */
+    /* 棋盘（含 #stage 的 8px 内边距 + 1px 边框）比这个正方形还大 ⇒ 才需要滚动 ⇒ 此时才收敛 ✓ */
+    const need=(needW>side+1)||(needH>side+1);
+    setVar(need?(side+'px'):'none');
+    /* 2.4.48：量完把视口位置端回来（松开量尺寸那一下的钳位**不可逆**，必须自己还 ✓）
+     *   同一任务内完成 ⇒ 用户看不到跳动；容器真的变矮时浏览器会自然钳到合法范围 ✓ */
+    try{
+      if(Math.abs((area.scrollTop||0)-keepTop)>0.5) area.scrollTop=keepTop;
+      if(Math.abs((area.scrollLeft||0)-keepLeft)>0.5) area.scrollLeft=keepLeft;
+    }catch(e){}
+  }catch(e){}
+}
 function renderGrid(st){
   const grid=$('#grid'); if(!grid) return;
   const vs=readViewState();
@@ -1589,7 +1651,20 @@ function renderGrid(st){
   const viewable=new Set(Array.isArray(vs&&vs.enterable)?vs.enterable.map(n=>(+n)-1):[]);
   UI.viewCells=disp.cells;
   UI.viewSpaceId=disp.spaceId;                 /* 记录"当前显示的空间"，供 playEvents 判定是否"同空间换层" */
-  resetEl(grid);
+  /* 2.4.48（用户报例）：「每移动一步，大关卡的**纵向**滑动条都会回到顶端（横向没事）」——
+   *   根因：原来这里 `resetEl(grid)` **先把格子全清掉**，而 `#grid` 的**高度是靠内容撑的**
+   *         （见下面 2.4.32 那条注释：行高依赖每格自己的 `aspect-ratio`）⇒ 清空的那一瞬间高度≈0
+   *         ⇒ 浏览器把 `#board-area`.scrollTop **钳成 0**（钳位**不可逆**：格子回来也不会自己还原 ✗）；
+   *         而**宽度**来自显式 `gridTemplateColumns`（清空也还在）⇒ 横向 scrollLeft 毫发无伤
+   *         —— 这正是"纵向回顶、横向很好"的由来 ✓
+   *         （诊断脚本 `dev/_diag-scroll-jump.js`：给 `scrollTop` 装了 setter 探针，**一次 JS 写入都没抓到**；
+   *           把 `overflow-anchor` 设成 `none` 也无效 ⇒ 既不是 JS、也不是滚动锚定，就是**钳位** ✓）
+   *   修法（双保险，同一任务内完成 ⇒ 用户看不到跳动）：
+   *     ① 改成"**先追加新的、再删旧的**" ⇒ `#grid` 不再出现"空"的中间态 ⇒ 高度不塌、压根不会被钳 ✓
+   *     ② 重绘前后**自己把视口位置端回来**（真换了空间/边长导致内容变矮时，浏览器仍会自然钳位 ✓）*/
+  const boardArea=$('#board-area');
+  const keepTop=boardArea?boardArea.scrollTop:0, keepLeft=boardArea?boardArea.scrollLeft:0;
+  const oldCells=(grid.children&&grid.children.length)?Array.prototype.slice.call(grid.children):[];
   /* 2.4.31（边长可配置）：网格列数按本棋盘的边长来 ✓（默认 7 ⇒ 与老行为一致） */
   const bn=boardN();
   /* 2.4.33（用户定版）：**格子保持可读大小，棋盘该长大就长大** ——
@@ -1625,6 +1700,9 @@ function renderGrid(st){
     frag.appendChild(el);
   });
   grid.appendChild(frag);
+  /* 2.4.48：新的已经上屏，再撤掉旧的 ⇒ `#grid` 全程非空（不会塌高度、不会把 scrollTop 钳掉）✓ */
+  oldCells.forEach((n)=>{ try{ if(n.parentNode===grid) grid.removeChild(n); }catch(e){} });
+  if(boardArea){ boardArea.scrollTop=keepTop; boardArea.scrollLeft=keepLeft; }   /* ② 端回视口位置 ✓ */
   /* —— 2.4.21（用户定版）：`view-switch` 的淡入**只在"真的换了视图"时播一次** ——
      · 原来这里是 `toggle('view-switch', viewing)`：查看视图下**每次重绘**都会重播一次淡入
        ⇒ 受阻（"此路不通"）那条路径也会 `renderGrid` ⇒ 整块棋盘莫名闪一下 ✗
@@ -1637,6 +1715,10 @@ function renderGrid(st){
   UI.player=st.player;                 /* AC 位置仍以真实状态为准（查看不改变 AC） */
   moveToken(st.player);
   updateViewBadge(vs);
+  /* 2.4.43：棋盘画完就按**实际位置**算一次能有多高（换关/换视图/大边长都会走到这里 ✓）
+     —— 再补一帧：首屏那一次布局可能还没落定 ✓ */
+  fitBoardArea();
+  try{ if(typeof requestAnimationFrame==='function') requestAnimationFrame(()=>fitBoardArea()); }catch(e){}
 }
 /* —— 查看视图交互：点盒进入 / 点边界退出 / V 回位 —— */
 function rerenderView(){
@@ -1782,19 +1864,10 @@ function renderHeader(){
   badge.textContent=t||'—';
   badge.className='type-badge '+(t||'').toLowerCase();
   $('#steps').textContent=st.moves;
-  const path=st.stack.map(e=>e.spaceId);
-  if(!path.length) path.push(1);
-  if(path[path.length-1]!==curId) path.push(curId);
-  const cr=$('#crumbs');
-  resetEl(cr);
-  path.forEach((s,i)=>{
-    if(i) { const sep=document.createElement('i'); sep.textContent='›'; cr.appendChild(sep); }
-    if(s===curId){
-      const b=document.createElement('b'); b.className='cur'; b.textContent=fmtSpace(s); cr.appendChild(b);
-    }else{
-      const sp=document.createElement('span'); sp.textContent=fmtSpace(s); cr.appendChild(sp);
-    }
-  });
+  /* 2.4.47（用户定版）：「1ms › 2ms › 3ms …」这排**空间路径面包屑已删除** ——
+   *   有了「查看视图」就不需要它了（游玩/试玩界面一律不显示）✓
+   *   ⇒ 原来的 `const path=st.stack.map(...)` + `#crumbs` 填充整段拿掉；
+   *   当前空间仍由上面的 `#view-name` / `#cur-box` 显示 ✓ */
 }
 function computeEnterables(st){
   /* 引擎若给出“可进入列表”（数组），直接采用；布尔值（引擎 v2：_canEnterAny 为 bool）或 null 时自行计算 */
@@ -2647,7 +2720,9 @@ function edInitGo(){
   };
   if(ED.initKind==='rename'){
     const from=ED.initRenameFrom;
-    if(from===name){ edMsg('名字没变'); edShow('main'); edRenderMain(); return; }
+    /* 2.4.46（用户：『名字没变也要直接回管理器，只要是点了确定重命名就要返回管理器』）
+     *   以前这里回的是**编辑关卡**主界面 ✗ ⇒ 与「确定重命名」的语义不一致 ✓ */
+    if(from===name){ edMsg('名字没变'); edOpenManager(); return; }
     if(ED.lib[name]){                                  /* 用户第 1 条：撞名 ⇒ 问一句 ✓ */
       edAsk('已有同名关卡「'+name+'」<br><span class="ask-sub">覆盖它（原关卡的内容会被这一关取代），还是换个名字？</span>',[
         {label:'覆盖', cls:'primary', fn:()=>{
@@ -2655,10 +2730,11 @@ function edInitGo(){
           delete ED.lib[from]; ED.lib[name]=keep; ED.lib[name].name=name;
           if(ED.savedAs===from) ED.savedAs=name;
           edSaveLib(); if(ED.name===from) ED.name=name;      /* 2.4.42：没有输入框了，直接改 ED.name ✓ */
-          edShow('main'); edRenderMain(); edMsg('已重命名为「'+name+'」（覆盖了同名关卡）');
+          /* 2.4.45（用户第 1 条）：重命名是从**关卡管理器**进来的 ⇒ 做完回管理器 ✓（不回编辑关卡 ✗）*/
+          edOpenManager(); edMsg('已重命名为「'+name+'」（覆盖了同名关卡）');
         }},
         {label:'换个名字', fn:()=>{ edOpenInit('rename', from); edMsg('换个名字'); }},
-        {label:'取消', fn:()=>{ edShow('main'); edRenderMain(); edMsg('已取消重命名'); }},
+        {label:'取消', fn:()=>{ edOpenManager(); edMsg('已取消重命名'); }},
       ]);
       return;
     }
@@ -2667,7 +2743,8 @@ function edInitGo(){
     if(ED.savedAs===from) ED.savedAs=name;
     edSaveLib();
     if(ED.name===from) ED.name=name;                 /* 2.4.42：同上，直接改 ED.name ✓ */
-    edShow('main'); edRenderMain();
+    /* 2.4.45（用户第 1 条）：确定重命名后回**关卡管理器**（重命名就是从那里点进来的 ✓）*/
+    edOpenManager();
     edMsg('已重命名为「'+name+'」');
     return;
   }
@@ -4885,6 +4962,8 @@ function bindClick(id,fn){
   return el;
 }
 function wireEvents(){
+  /* 2.4.43：窗口尺寸一变，"棋盘区还能有多高"就得重算（纵向滚动条的开关靠它 ✓）*/
+  try{ window.addEventListener('resize',()=>fitBoardArea()); }catch(e){}
   window.addEventListener('keydown',e=>{
     if(!UI.engine&&!UI.browseMode) return;
     /* 输入框聚焦：不拦截任何按键（Esc 可失焦） */
