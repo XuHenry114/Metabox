@@ -1,0 +1,302 @@
+{
+  "space": 10,
+  "type": "MLE",
+  "ac": 46,
+  "cells": [
+    {
+      "id": 1,
+      "label": "MLE",
+      "space": 10,
+      "size": "999.00MB"
+    },
+    {
+      "id": 2,
+      "label": "MLE",
+      "space": 10,
+      "size": "999.00MB"
+    },
+    {
+      "id": 3,
+      "label": "MLE",
+      "space": 10,
+      "size": "999.00MB"
+    },
+    {
+      "id": 4,
+      "label": "MLE",
+      "space": 10,
+      "size": "999.00MB"
+    },
+    {
+      "id": 5,
+      "label": "MLE",
+      "space": 10,
+      "size": "999.00MB"
+    },
+    {
+      "id": 6,
+      "label": "MLE",
+      "space": 10,
+      "size": "999.00MB"
+    },
+    {
+      "id": 7,
+      "label": "MLE",
+      "space": 10,
+      "size": "999.00MB"
+    },
+    {
+      "id": 8,
+      "label": "WA",
+      "space": 0,
+      "size": "0B"
+    },
+    {
+      "id": 9,
+      "label": "WA",
+      "space": 0,
+      "size": "0B"
+    },
+    {
+      "id": 10,
+      "label": "WA",
+      "space": 0,
+      "size": "0B"
+    },
+    {
+      "id": 11,
+      "label": "WA",
+      "space": 0,
+      "size": "0B"
+    },
+    {
+      "id": 12,
+      "label": "MLE",
+      "space": 10,
+      "size": "999.00MB"
+    },
+    {
+      "id": 13,
+      "label": "MLE",
+      "space": 10,
+      "size": "999.00MB"
+    },
+    {
+      "id": 14,
+      "label": "MLE",
+      "space": 10,
+      "size": "999.00MB"
+    },
+    {
+      "id": 15,
+      "label": "MLE",
+      "space": 10,
+      "size": "999.00MB"
+    },
+    {
+      "id": 16,
+      "label": "MLE",
+      "space": 10,
+      "size": "999.00MB"
+    },
+    {
+      "id": 17,
+      "label": "MLE",
+      "space": 10,
+      "size": "999.00MB"
+    },
+    {
+      "id": 18,
+      "label": "WA",
+      "space": 0,
+      "size": "0B"
+    },
+    {
+      "id": 19,
+      "label": "MLE",
+      "space": 10,
+      "size": "999.00MB"
+    },
+    {
+      "id": 20,
+      "label": "MLE",
+      "space": 10,
+      "size": "999.00MB"
+    },
+    {
+      "id": 21,
+      "label": "MLE",
+      "space": 10,
+      "size": "999.00MB"
+    },
+    {
+      "id": 22,
+      "label": "WA",
+      "space": 0,
+      "size": "0B"
+    },
+    {
+      "id": 23,
+      "label": "WA",
+      "space": 0,
+      "size": "0B"
+    },
+    {
+      "id": 24,
+      "label": "WA",
+      "space": 0,
+      "size": "0B"
+    },
+    {
+      "id": 25,
+      "label": "WA",
+      "space": 0,
+      "size": "0B"
+    },
+    {
+      "id": 26,
+      "label": "MLE",
+      "space": 10,
+      "size": "999.00MB"
+    },
+    {
+      "id": 27,
+      "label": "MLE",
+      "space": 10,
+      "size": "999.00MB"
+    },
+    {
+      "id": 28,
+      "label": "MLE",
+      "space": 10,
+      "size": "999.00MB"
+    },
+    {
+      "id": 29,
+      "label": "MLE",
+      "space": 10,
+      "size": "999.00MB"
+    },
+    {
+      "id": 30,
+      "label": "MLE",
+      "space": 10,
+      "size": "999.00MB"
+    },
+    {
+      "id": 31,
+      "label": "MLE",
+      "space": 10,
+      "size": "999.00MB"
+    },
+    {
+      "id": 32,
+      "label": "MLE",
+      "space": 10,
+      "size": "999.00MB"
+    },
+    {
+      "id": 33,
+      "label": "MLE",
+      "space": 10,
+      "size": "999.00MB"
+    },
+    {
+      "id": 34,
+      "label": "MLE",
+      "space": 10,
+      "size": "999.00MB"
+    },
+    {
+      "id": 35,
+      "label": "MLE",
+      "space": 10,
+      "size": "999.00MB"
+    },
+    {
+      "id": 36,
+      "label": "WA",
+      "space": 0,
+      "size": "0B"
+    },
+    {
+      "id": 37,
+      "label": "WA",
+      "space": 0,
+      "size": "0B"
+    },
+    {
+      "id": 38,
+      "label": "WA",
+      "space": 0,
+      "size": "0B"
+    },
+    {
+      "id": 39,
+      "label": "WA",
+      "space": 0,
+      "size": "0B"
+    },
+    {
+      "id": 40,
+      "label": "MLE",
+      "space": 10,
+      "size": "999.00MB"
+    },
+    {
+      "id": 41,
+      "label": "MLE",
+      "space": 10,
+      "size": "999.00MB"
+    },
+    {
+      "id": 42,
+      "label": "MLE",
+      "space": 10,
+      "size": "999.00MB"
+    },
+    {
+      "id": 43,
+      "label": "MLE",
+      "space": 10,
+      "size": "999.00MB"
+    },
+    {
+      "id": 44,
+      "label": "MLE",
+      "space": 10,
+      "size": "999.00MB"
+    },
+    {
+      "id": 45,
+      "label": "MLE",
+      "space": 10,
+      "size": "999.00MB"
+    },
+    {
+      "id": 46,
+      "label": "AC",
+      "space": 0,
+      "size": "0B"
+    },
+    {
+      "id": 47,
+      "label": "MLE",
+      "space": 10,
+      "size": "999.00MB"
+    },
+    {
+      "id": 48,
+      "label": "MLE",
+      "space": 10,
+      "size": "999.00MB"
+    },
+    {
+      "id": 49,
+      "label": "MLE",
+      "space": 10,
+      "size": "999.00MB"
+    }
+  ],
+  "notes": "右下角 #49 卡有“洛谷”水印，不影响文字读取。"
+}
