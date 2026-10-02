@@ -489,6 +489,7 @@
   .ed-tools{display:flex;flex-direction:column;gap:8px;width:clamp(180px,17vw,240px);flex:0 0 auto}
   .ed-tool{padding:10px 13px;border-radius:9px;background:var(--panel2);border:1px solid var(--line);color:#dfe9ff;font-size:13.5px;cursor:pointer;text-align:left}
   .ed-tool.on{background:#2b4a80;border-color:#4b7ac0}
+  /* 2.4.50（用户第 4 条）：`.ed-autosave` 那颗「✓ 已自动保存」状态标已删除（优化观感）✓ */
   .ed-lab{font-size:11.5px;color:#9fb0c8;display:flex;flex-direction:column;gap:4px}
   .ed-lab input,.ed-lab select{background:#0e1526;border:1px solid var(--line);color:#e8f0ff;border-radius:7px;padding:6px 8px;font-size:12.5px;width:100%}
   .ed-board{display:flex;flex-direction:column;gap:6px;align-items:center}
@@ -859,9 +860,13 @@
     <div class="studio-actions">
       <button id="ed-newspace" class="primary">＋ 新建盒子</button>
       <button id="ed-play">🕹 试玩本关</button>
-      <button id="ed-save">💾 保存到本地</button>
+      <!-- 2.4.49（用户第 1 条）：`💾 保存到本地` 按钮**已删除** —— 每次回到本屏（编辑关卡）都会**自动保存**，
+           忘了点保存也不会丢内容 ✓（原来的手动保存 + 撞名弹窗也随之取消：名字由「新建/重命名」定下，
+           重名覆盖在重命名那一步已经问过了 ✓）-->
       <button id="ed-export">⬇ 导出本关 .json</button>
       <span class="grow"></span>
+      <!-- 2.4.50（用户第 4 条）：那颗「✓ 已自动保存」状态标**已删除**（优化观感）——
+           自动保存不再占用顶栏任何位置 ✓ -->
       <!-- 用户第 3/4 条：**编辑关卡**这一组撤回的作用域 = "上一步对一个盒子进行的（整体）更改" ✓ -->
       <button id="ed-undo-lv" class="studio-nav" title="撤回上一步对盒子的改动（Z）">↩ 撤回 Z</button>
       <button id="ed-redo-lv" class="studio-nav" title="重做下一步（Y）">↪ 重做 Y</button>
@@ -877,6 +882,8 @@
     <div class="studio-title-row">
       <h2 id="ed-space-title">新建盒子</h2>
       <div class="grow"></div>
+      <!-- 2.4.49（用户第 2 条）：一键把**当前盒子空间**里的空地 ⇄ 墙互换（可撤回 Z）✓ -->
+      <button id="ed-swap-fw" class="studio-nav" title="把本盒子里所有空地变成墙、墙变成空地（可撤回 Z）">空地 ⇄ 墙</button>
       <!-- 用户第 3 条：**编辑盒子**里这组撤回的作用域 = "上一步对这个盒子空间的更改" ✓ -->
       <button id="ed-undo-bx" class="studio-nav" title="撤回上一步对盒子的更改（Z）">↩ 撤回 Z</button>
       <button id="ed-redo-bx" class="studio-nav" title="重做下一步（Y）">↪ 重做 Y</button>
@@ -2084,8 +2091,17 @@ function edApplyState(s, scope){
   ED.spaces=o.spaces||{}; ED.ac=o.ac||{space:null,cell:null}; ED.goal=(o.goal!=null?o.goal:null);
   ED.name=o.name||'未命名关卡'; ED.draft=o.draft||null; ED.n=edSizeOk(o.n)||7;
   if(o.sc) ED.sizeConfirmed=true;              /* 2.4.32：只往前推，不因为撤回又把"问过"抹掉 ✓ */
-  if(ED.draft) edShowDraft();                       /* 撤回一步编辑 ⇒ 留在编辑屏，草稿原样回来 ✓ */
-  else { edShow('main'); edRenderMain(); }
+  /* ===== 2.4.58（用户第 1 条）：**撤回 / 重做不换屏** =====
+   * 用户原话：「点击"编辑关卡"界面的撤回，界面应该停留在"编辑关卡"界面，
+   *   不应该跳转到"编辑盒子"界面」✓
+   * 旧版：整关快照里带着"当时正在编辑的草稿"（`ED.draft`）⇒ 撤回一步"确定盒子"
+   *   就把那只盒子当草稿**重新铺到"编辑盒子"那一屏**（`edShowDraft()`）⇒ 一撤回就跳屏 ✗
+   * 现在：草稿照常恢复（**数据**要一致），但**界面按界面栈停住不动** ✓
+   *（想接着改那只盒子 ⇒ 点它的「编辑」即可：那时用 `ED.spaces` 里**已回退**的版本重建草稿 ✓）*/
+  const topNow=edScreenTop();
+  if(topNow==='space') edShowDraft();                    /* 确实在"编辑盒子"屏 ⇒ 照旧把草稿铺出来 ✓ */
+  else if(topNow==='manager'){ edShow('manager'); edRenderManager(); }   /* 在管理器 ⇒ 留在管理器 ✓ */
+  else { edShow('main'); edRenderMain(); }               /* 其余（正常就是"编辑关卡"）⇒ 留在编辑关卡 ✓ */
   edSyncHistBtns();
 }
 function edHistPush(before, scope){
@@ -2135,21 +2151,79 @@ function edNormalizeAC(){
   return true;
 }
 function edMsg(t){ const m=$('#ed-msg'); if(m) m.textContent=t; }
+/* ================= 2.4.49（用户第 1 条）· 回到「编辑关卡」就自动保存 =================
+ * 用户原话：「每次回到『编辑关卡』界面就自动保存，删去『保存到本地』按钮，否则容易因为忘记保存而丢失编辑内容」
+ *   · 触发点：`edShow('main')`（= 到达编辑关卡这一屏）✓；另外**离开这一屏**时也补一次（见 edShow）
+ *   · 静默保存：不弹窗、不打扰（撞名提示只在「重命名」那一步问过了 ✓）
+ *   · `ED.savedAs` / `mtime` 都照常维护 ⇒ 关卡的"最近修改"排序照旧 ✓ */
+function edAutoSave(tag){
+  if(!ED.name) return false;
+  if(!ED.spaces||typeof ED.spaces!=='object') return false;
+  try{
+    edCommitToLib(ED.name);
+    /* 2.4.50（用户第 4 条）：顶栏那颗「✓ 已自动保存」状态标已删（优化观感）⇒ 这里不再写任何提示 ✓ */
+    if(tag) edMsg(tag);
+    return true;
+  }catch(e){ return false; }
+}
+/* ===== 2.4.58（用户第 2 条）：**界面栈**（父子关系唯一的一份记录）=====
+ * 用户原话：「各个界面的父子关系应该由一个栈来记录」✓
+ * · 工作台内部三档：关卡管理器(0) < 初始化 / 编辑关卡(1) < 编辑盒子(2) ✓
+ * · 「游玩 / 试玩」那一屏**跳出工作台**（用主棋盘 + `#playtest-bar` 那条），
+ *   它挂在**进来时那一屏**下面 ⇒ 结束时**弹回父屏**、且**不动任何撤回栈** ✓
+ *   （旧实现结束时走 `enterMode('create') → edOpenEditor()`：那一把会把撤回栈整个清空、
+ *     还把界面重置回"关卡管理器" ⇒ 用户第 2 条报例：撤回按钮的「（1）」凭空没了 ✗）
+ * · `edScreenEnter(which)` 压栈：**已在栈里** ⇒ 先把它上面的弹掉（= 回到那个祖先界面）；
+ *   栈顶恒等于 `ED.screen`（= 当前界面）✓ */
+function edScreenStack(){ if(!Array.isArray(ED.screenStack)) ED.screenStack=[]; return ED.screenStack; }
+function edScreenTop(){ const st=edScreenStack(); return st.length?st[st.length-1]:(ED.screen||null); }
+function edScreenParent(){ const st=edScreenStack(); return st.length>1?st[st.length-2]:null; }
+function edScreenEnter(which){
+  const st=edScreenStack();
+  const at=st.indexOf(which);
+  if(at>=0) st.length=at+1; else st.push(which);      /* 回祖先 ⇒ 弹掉它上面的 ✓ / 新界面 ⇒ 压栈 ✓ */
+  if(st.length>8) st.splice(0,st.length-8);           /* 护栏：正常层级只有 3~4 层 ✓ */
+  ED.screen=which;                                    /* 栈顶 = 当前界面 ✓ */
+  return which;
+}
 function edShow(which){
   /* 2.4.40（用户定版）：创造模式 = **五屏** —— 关卡管理器 / 初始化关卡 / 编辑关卡 / 编辑盒子 /
    *   游玩关卡（游玩那一屏跳出工作台，用主界面的棋盘 + `#playtest-bar`）✓ */
   const screens={manager:'#ed-manager', init:'#ed-init', main:'#ed-main', space:'#ed-space-panel'};
+  const prev=ED.screen;
   Object.keys(screens).forEach(k=>{
     const el=$(screens[k]);
     if(el) el.classList.toggle('hidden', which!==k);
   });
-  ED.screen=which;
+  /* 2.4.58（用户第 2 条）：改走**界面栈** —— 父子关系由它记，`ED.screen` = 栈顶 ✓ */
+  edScreenEnter(which);
   const crumb=$('#ed-crumb');
   if(crumb) crumb.textContent = which==='manager' ? '关卡管理器'
     : which==='init' ? (ED.initKind==='rename' ? '重命名关卡' : '初始化关卡')
     : which==='main' ? ('编辑关卡 · '+ED.name)
     : which==='space' ? ('编辑盒子 · '+(ED.draft?ED.draft.id+'ms':''))
     : '创造模式';
+  /* 2.4.49（用户第 3 条）：**退回到祖先界面 ⇒ 清空操作记录**，保证各空间互不干扰 ✓
+   *   界面的层级（用户第 3 条给的例子）：开始界面 < 关卡管理器 < 编辑关卡 < 编辑盒子 ——
+   *   `空间 id` 那一屏（初始化/重命名）挂在管理器下面，没有撤回记录 ✓
+   *   ⇒ 只要 `which` 是 `prev` 的**祖先**（层级更小），就清掉层级比它深的那几组记录：
+   *      退回「编辑关卡」⇒ 清「编辑盒子」那组（histBox/futureBox）
+   *      退回「关卡管理器 / 开始界面」⇒ 两组都清（histBox + hist）✓
+   *   ⚠ 反向（编辑关卡 → 编辑盒子）**不清**：那是往下走，不是"退出到祖先" ✓ */
+  const RANK={manager:0, init:1, main:1, space:2};
+  const toAncestor=(prev!=null && RANK[which]!=null && RANK[prev]!=null && RANK[which]<RANK[prev]);
+  if(prev&&prev!==which){
+    if(toAncestor){
+      if(RANK[which]<2){ ED.histBox.length=0; ED.futureBox.length=0; }
+      if(RANK[which]<1){ ED.hist.length=0; ED.future.length=0; }
+      edSyncHistBtns();
+    }
+    /* 2.4.49（用户第 1 条）：**离开「编辑关卡」也补存一次** —— 主界面上做的改动（删盒子、改设置…）
+     *   不是"回到本屏"触发的，若不补存就又会丢 ✓ */
+    if(prev==='main'&&toAncestor) edAutoSave();
+  }
+  /* 2.4.49（用户第 1 条）：**到达「编辑关卡」⇒ 自动保存**（含从「编辑盒子」返回、取消、撤回落到本屏）✓ */
+  if(which==='main'&&prev!=='main') edAutoSave();
 }
 /* ================= 2.4.31（用户定版）· 先定盒子大小 =================
  * 用户：「在点击创造模式后，先确定盒子的大小（应该为一个不小于5的正奇数，不合法的输入应该被拦截，
@@ -2352,6 +2426,37 @@ function edOpenSpace(id){
   document.querySelectorAll('.ed-tool').forEach(b=>b.classList.toggle('on',b.dataset.tool==='wall'));
   edShow('space'); edRenderDraft();
 }
+/* ================= 2.4.49（用户第 2 条）·「空地 ⇄ 墙」 =================
+ * 用户：「在『编辑盒子』界面添加按钮『空地⇄墙』，表示交换当前盒子空间中所有的空地和墙，
+ *        即空地变为墙，墙变为空地」✓
+ * 2.4.50（用户第 5 条）修缮：「**只应该改变所有空地和墙的位置**，而不应该出现『AC 起点那格变成了墙』的情况」
+ *   ⇒ ① 只互换 `k:'f'` ⇄ `k:'w'`，`k:'b'`（盒子）原样保留 ✓
+ *      ② **AC 起点所在的那一格排除在交换之外，并强制保持空地** ——
+ *         否则一交换 AC 就站在墙上（旧版还会因此把 AC 起点清空 ✗，用户看到的就是那句提示）
+ *      ③ 一步 = 一次撤回（作用域 = 「编辑盒子」那组，按 Z 可整体还原 ✓）
+ *      ④ 交换后关卡可能变得不合法（例如 1ms 全变墙）⇒ 交给既有校验拦在"试玩"那一步 ✓ 不在这里猜 */
+function edSwapFloorWall(){
+  const D=ED.draft;
+  if(!D||!Array.isArray(D.cells)){ edMsg('先打开一个盒子，再交换空地/墙'); return false; }
+  const before=edStateOf('box');
+  /* AC 起点那一格（只在 1ms 有效）：排除交换 + 强制空地 ✓ */
+  const acCell=(ED.ac&&String(ED.ac.space)===String(D.id)&&ED.ac.cell!=null)?+ED.ac.cell:null;
+  let f2w=0, w2f=0;
+  D.cells.forEach((c,i)=>{
+    if(!c) return;
+    if(acCell!=null&&(i+1)===acCell) return;              /* ← AC 起点格：不参与交换 ✓ */
+    if(c.k==='f'){ D.cells[i]={k:'w',sp:null}; f2w++; }
+    else if(c.k==='w'){ D.cells[i]={k:'f',sp:null}; w2f++; }
+  });
+  if(acCell!=null){
+    const i=acCell-1, c=D.cells[i];
+    if(c&&c.k!=='f'){ D.cells[i]={k:'f',sp:null}; }       /* ← 保证 AC 站在空地上（绝不清空 AC）✓ */
+  }
+  edHistPush(before,'box');
+  edShowDraft();
+  edMsg('已交换：空地→墙 '+f2w+' 格、墙→空地 '+w2f+' 格'+(acCell!=null?'（AC 起点那格保持空地）':''));
+  return true;
+}
 function edRenderDraft(){
   const sel=$('#ed-sbox');
   /* 2.4.25（用户第 2 条）：先**读出当前选择**再重建 —— 否则每放一只盒子，
@@ -2442,12 +2547,28 @@ function edPaintDraft(cellId){
     if(opt.sizes.indexOf(size)<0){ edMsg('盒标记改成 '+opt.sizes[0].replace('1.00MB','1MB')+'：'+opt.why); size=opt.sizes[0]; }
     const cell=edCellBox(+sp,size);
     D.cells[i]=cell;
+    /* ===== 2.4.57（用户报例）：**用「盒子」工具点"AC 起点"那一格 ⇒ AC 起点被替换掉** =====
+     * 用户原话：「在"编辑盒子"界面，用"盒子"工具点击"AC起点"所在位置，"AC起点"应该被替换掉」✓
+     * 旧版这一支**不动** `ED.ac` ⇒ 渲染（`edRenderDraft` 里 `acHere===id` 优先）和导出
+     *   （`edSpaceToCells` 里 `acCell===id` 优先）**都是"AC 赢"** ⇒ 点上去像没反应：
+     *   那一格还是显示 `AC`、刚放的盒子被**悄悄丢掉** ✗
+     * ⇒ 现在与「墙 / 空地」两支**同一条规矩**：一格只能有一个东西，**谁后画谁赢** ✓ */
+    const acReplaced=(String(ED.ac.space)===String(D.id)&&ED.ac.cell===cellId);
+    if(acReplaced) ED.ac={space:null,cell:null};
+    let note='';
     /* 2.4.25（用户第 3 条）：放 `MLE xms 0B` 而之前已有 xms 0B
-     *   ⇒ 把上一次那只改成 xms 1MB、**发提示语**，然后在这里放新的 xms 0B ✓ */
+     *   ⇒ 把上一次那只改成 xms 1MB、**发提示语**，然后在这里放新的 xms 0B ✓
+     * 2.4.53（用户第 1 条更正）：这一下**就该一起被撤销** ——
+     *   用户原话（更正后）：「撤销这一步，这个 1MB 盒**应该同样受到撤销的影响变成 0B 盒**」
+     *   ⇒ 笔画快照仍取在**整笔开始前**（`pointerdown`），撤销一次把"降级 + 放新盒"一起回退 ✓
+     *   （2.4.52 我理解反了、改成了"降级不进撤销" —— 已撤回 ✗）*/
     if(size==='0B'){
       const n=edOverrideZeroB(+sp, cell, D.cells);
-      if(n) edMsg('上一次那只 '+sp+'ms 0B 已改成 1MB（'+edTargetType(sp)+' 只能有 1 只 0B）');
+      if(n) note='上一次那只 '+sp+'ms 0B 已改成 1MB（'+edTargetType(sp)+' 只能有 1 只 0B）';
     }
+    /* 2.4.57：AC 起点被这一笔替换掉 ⇒ 也告诉用户一声（与上面那条提示**合并成一句** ✓）*/
+    if(acReplaced) note=(note?note+'；':'')+'这一格原来是 AC 起点 ⇒ 已换成 '+sp+'ms 盒子（AC 起点被替换掉了）';
+    if(note) edMsg(note);
   }else if(t==='ac'){
     /* 2.4.23（用户第 8 条）：AC 起点**只在 1ms 中有效** —— 在别的空间里点它直接拒绝 ✓ */
     if(String(D.id)!=='1'){
@@ -3005,39 +3126,12 @@ function edAskDeleteLevels(names){
 
 function edWire(){
   const grid=$('#ed-grid');
-  /* ================= 2.4.24 · 「保存到本地」（用户第 1 条）=================
- * 用户要求：**新关卡名 ⇒ 直接存，不覆盖；已存在的关卡名 ⇒ 弹窗问一下要不要覆盖** ✓
- * （2.4.23 那版是"改名就顺手把旧槽删掉"，用户改主意了：不许静默覆盖 ✓）
- */
-function edSaveToLocal(){
-  /* 2.4.42：顶栏那个"关卡名"输入框已删 ⇒ 名字就是 `ED.name`（由初始化/重命名定下）✓ */
-  ED.name=edLevelName(ED.name)||'未命名关卡';
-  const exists=!!ED.lib[ED.name];
-  const isSelf=(ED.savedAs===ED.name);           /* 就是本次会话自己的槽（原样再存一次）*/
-  if(!exists){ edDoSave(); edMsg('已保存「'+ED.name+'」'); return; }
-  if(isSelf){ edDoSave(); edMsg('已覆盖「'+ED.name+'」'); return; }
-  /* 撞上别的存档 ⇒ 问一句 ✓ */
-  edAsk('本地已有一个叫「'+ED.name+'」的存档<br><span class="ask-sub">覆盖它，还是换个名字另存？</span>',[
-    {label:'覆盖它', cls:'primary', fn:()=>{ edDoSave(); edMsg('已覆盖「'+ED.name+'」'); }},
-    {label:'换个名字另存', fn:()=>{
-      let i=2, base=ED.name;
-      while(ED.lib[base+' ('+i+')']) i++;
-      ED.name=base+' ('+i+')';
-      edDoSave(); edMsg('已另存为「'+ED.name+'」');
-    }},
-    {label:'取消', fn:()=>edMsg('已取消保存')},
-  ]);
-}
-function edDoSave(){
-  ED.name=edLevelName(ED.name)||'未命名关卡';
-  const before=edStateOf();
-  ED.lib[ED.name]={name:ED.name,n:ED.n,spaces:JSON.parse(JSON.stringify(ED.spaces)),ac:JSON.parse(JSON.stringify(ED.ac)),goal:ED.goal};
-  ED.savedAs=ED.name;
-  const ok=edSaveLib();
-  edHistPush(before);
-  if(!ok) edMsg('保存失败（浏览器禁用了本地存储？）');
-  edRenderMain();
-}
+  /* ================= 2.4.49（用户第 1 条）· 「保存到本地」整条链路已删除 =================
+   * 用户原话：「每次回到『编辑关卡』界面就自动保存，删去『保存到本地』按钮」
+   * ⇒ `edSaveToLocal()`（含"撞名弹窗/另存"那套）与 `edDoSave()` 一并删掉，改由：
+   *     · `edShow('main')`（到达编辑关卡）与"离开编辑关卡"两个时机调 `edAutoSave()` ✓
+   *     · 落库走既有的 `edCommitToLib()`（会写 mtime、维护 `ED.savedAs`、并 `edSaveLib()`）✓
+   * 名字的唯一来源是「新建 / 重命名」那两步（重名覆盖在那里已经问过）⇒ 这里不再需要弹窗 ✓ */
   /* 极简确认弹窗 `edAsk` / `edAskClose` 已上移到**顶层**（原本定义在 `edWire()` 里 ✗）——
      2.4.40 起 `edAskDeleteLevels` / `edImportText` / `edInitGo` 这些**顶层**函数也要用它，
      而函数声明在 `edWire` 内部对外不可见 ⇒ 一调就是 ReferenceError（被事件吞掉，弹窗静默不出现）✗ */
@@ -3061,8 +3155,9 @@ function edDoSave(){
     const endStroke=()=>{
       if(!dragging) return;
       dragging=false; painted=null;
-      /* 一次笔画结束才结算：**真的改动了才入历史** ⇒ 空点几下不会塞满撤回栈 ✓ */
-      /* 2.4.40：一次笔画结束才结算 —— **入"编辑盒子"那一组撤回栈**（作用域 = 这个盒子空间）✓ */
+      /* 一次笔画结束才结算：**真的改动了才入历史** ⇒ 空点几下不会塞满撤回栈 ✓
+         2.4.40：入"编辑盒子"那一组撤回栈（作用域 = 这个盒子空间）✓
+         2.4.53：快照仍是"整笔开始前" ⇒ 撤销一次把这一笔的全部效果（含自动降级成 1MB）一起回退 ✓ */
       if(strokeBefore!=null&&edStateOf('box')!==strokeBefore) edHistPush(strokeBefore,'box');
       strokeBefore=null;
     };
@@ -3167,7 +3262,8 @@ function edDoSave(){
   on('ed-stop-play',()=>edStopPlaytest());
   on('ed-ok',()=>edConfirmDraft());
   on('ed-cancel',()=>{ ED.draft=null; edShow('main'); edRenderMain(); edMsg('已取消'); });
-  on('ed-save',()=>edSaveToLocal());
+  /* 2.4.49：`#ed-save`（💾 保存到本地）已删除 ⇒ 这里换成**空地 ⇄ 墙** ✓ */
+  on('ed-swap-fw',()=>edSwapFloorWall());
   on('ed-export',()=>{
     try{
       /* 2.4.36 报例②（"改了名字导出还是旧名字"）的根因当时是"名字只在保存时才从输入框读回"；
@@ -3336,6 +3432,9 @@ function edPlaytest(){
   jumpSetLevel(edLevelKey());
   const c=$('#create-mode'), st0=$('#start');
   if(c) c.classList.add('hidden'); if(st0) st0.classList.add('hidden');
+  /* 2.4.58（用户第 2 条）：试玩那一屏 = 当前界面的**子界面** ⇒ 压进**界面栈** ✓
+   *   （回来时只弹回父屏，绝不重开编辑器 —— 见 `edStopPlaytest` / `enterMode` 的 keepEditor）*/
+  edShow('play');
   try{
     refreshJumpButtons();
     const st0=refresh();
@@ -3374,9 +3473,17 @@ function edStopPlaytest(){
   try{ initSpacesCache(); }catch(e){}
   jumpSetLevel('adventure');            /* 2.4.24（用户第 0 条）：跳转登记换回冒险模式那一份 ✓ */
   try{ const stR=refresh(); if(stR) renderGrid(stR); renderHeader(); renderEnterable(); renderLog(); renderHistorySeq(); }catch(e){}
-  /* 2.4.40：结束游玩回**来的那一屏** —— 从管理器进来的回管理器，从"试玩本关"进来的回编辑关卡 ✓ */
-  enterMode('create');
-  if(ED.playFrom==='manager'){
+  /* 2.4.40：结束游玩回**来的那一屏** —— 从管理器进来的回管理器，从"试玩本关"进来的回编辑关卡 ✓
+   * ===== 2.4.58（用户第 2 条）：改为**按界面栈弹回父屏** =====
+   * 用户原话：「各个界面的父子关系应该由一个栈来记录」+
+   *   「先编辑任意盒子，这时撤回按钮会显示"(1)"。然后点击"试玩本关"后再通过"结束试玩"返回，
+   *     撤回按钮应该继续显示"(1)"。…… 返回"编辑关卡"，撤销栈不应该有变化」✓
+   * 旧实现：`enterMode('create')` → `edOpenEditor()` ⇒ **撤回栈被整个清空**、界面还被重置回管理器 ✗
+   * 现在：① 外壳照旧放回来，但 **keepEditor**（不重开编辑器 ⇒ 不动任何编辑状态）✓
+   *       ② 父屏取自界面栈（`edScreenParent()`），栈里没有才退回 `ED.playFrom` 的老口径 ✓ */
+  enterMode('create',{keepEditor:true});
+  const back=edScreenParent()||(ED.playFrom==='manager'?'manager':'main');
+  if(back==='manager'){
     edOpenManager();
     edMsg('已结束游玩，回到关卡管理器');
   }else{
@@ -3398,7 +3505,8 @@ function showStartScreen(){
   UI.mode=null;
   try{ document.title="Escape's Metabox"; }catch(e){}
 }
-function enterMode(mode){
+function enterMode(mode,opts){
+  const keepEditor=!!(opts&&opts.keepEditor);
   UI.mode=mode;
   const s=$('#start'), c=$('#create-mode');
   if(s) s.classList.add('hidden');
@@ -3407,8 +3515,14 @@ function enterMode(mode){
     try{ document.title="创造模式 · Escape's Metabox"; }catch(e){}
     /* 2.4.31（用户定版）：进创造模式**先定盒子大小**，定了才开始创作 ✓
      * 2.4.32（用户定版）：**只在第一次问** —— 之后再回创造模式直接进编辑器，
-     *   否则每次都被问一遍、而且一点「开始创作」就把之前建好的盒子清空 ✗ */
-    try{ edWire(); edOpenEditor(); }catch(e){ edMsg('编辑器初始化失败：'+e.message); }
+     *   否则每次都被问一遍、而且一点「开始创作」就把之前建好的盒子清空 ✗
+     * ===== 2.4.58（用户第 2 条）：`keepEditor` = **只把创造模式的外壳放回来**，不重开编辑器 =====
+     *   「试玩本关」结束后回"编辑关卡"走这一支 —— 试玩那一屏是当前界面的**子界面**，
+     *   回来时不该动编辑器里的任何东西（尤其**撤回栈**）✓
+     *   （旧写法在这里调 `edOpenEditor()`：那一把会把撤回栈整个清空、界面还被重置回管理器 ✗）*/
+    if(!keepEditor){
+      try{ edWire(); edOpenEditor(); }catch(e){ edMsg('编辑器初始化失败：'+e.message); }
+    }
   }else{
     if(c) c.classList.add('hidden');
     try{ document.title="Escape's Metabox"; }catch(e){}
@@ -4245,6 +4359,17 @@ async function playEvents(prev,st,events,opts){
     toast('此路不通','warn',900);
     /* 受阻不入操作日志(用户定版:仅震动+提示+音效) */
   }
+  /* ===== 2.4.59（用户第 2 条）：一次动作的日志 = 「退出 <每一层真走出去的空间>」+「进入 <盒>」=====
+   * 用户口径（配他给的算例 `test.json` 按 `dd`）：
+   *   `退出 1ms / 退出 2ms / 进入 4ms / 进入 3ms` ✓ —— 退出的那两层是 AC **真的走出了它们的边界**
+   *   （1ms 走出去 → 落在 2ms 的 (r2,c6) 又在 2ms 之外 ⇒ 再退一层），而 **5ms 只被"落脚"、没被走出去**
+   *   ⇒ 不写「退出 5ms」✗；进入的那两个是 AC **真的进到了盒子里面**（先进 #14=4ms、再进 #6=3ms）✓
+   * · 退出链由引擎随**第一次**进入事件带下来（`ev.exits` = `_exitChainLanding` 的 records，栈底→栈顶）✓
+   * · 进入链 = 本步的每个 `enter` 事件 ✓
+   * · 兜底：`ev.exits` 缺失（老的帧路径 / 单层退出）⇒ 维持原口径"tunnel 进入补一行退出"✓
+   * · 「退出」本步**最多写一段**（`exitRowsWritten`）—— 链式进入不会再重复写 ✗
+   * · 盒子被推出 / 被顶开（`boxEnter`、`push`）**一律不进日志**（用户第 1 条：日志只记 AC 的操作）✓ */
+  let exitRowsWritten=false;
   for(const ev of events){
     if(ev.type==='teleport'||ev.type==='shuttle'){ logEventRow(evtRow(ev,st)); continue; }
     if(ev.type==='enter'||ev.type==='exit'){
@@ -4253,9 +4378,14 @@ async function playEvents(prev,st,events,opts){
            （19ms 穿梭到 19ms → 「退出 19ms」+「进入 19ms」；19ms 里按 w 进 20ms → 「退出 19ms」+「进入 20ms」）
          · **普通进入**（`tunnel:false`）只写一行「进入 <新空间>」
          · **退出**只写一行「退出 <离开的那个空间>」
-         注意「退出 X」的 X 一律 = **AC 移动前所在的空间**（prev.spaceId），不是落点、也不是目标盒的内部空间。 */
-      if(ev.type==='enter'&&ev.tunnel){
+         注意「退出 X」的 X 一律 = **AC 真正走出去的那一层空间**（2.4.59 起按引擎给的 `ev.exits` 逐层写；
+         没有 `ev.exits` 时退回旧口径 = AC 移动前所在的空间 `prev.spaceId`）✓ */
+      if(ev.type==='enter'&&!exitRowsWritten&&Array.isArray(ev.exits)&&ev.exits.length){
+        ev.exits.forEach(sid=>logEventRow({icon:EVT_ICON.exit, text:'退出 '+fmtSpace(sid)}));
+        exitRowsWritten=true;
+      }else if(ev.type==='enter'&&ev.tunnel&&!exitRowsWritten){
         logEventRow({icon:EVT_ICON.exit, text:'退出 '+fmtSpace(prev&&prev.spaceId!=null?prev.spaceId:st.spaceId)});
+        exitRowsWritten=true;
       }
       logEventRow(evtRow(ev,st,prev&&prev.spaceId));
       continue;
@@ -5045,6 +5175,9 @@ function wireEvents(){
     try{ if(UI.play) stopPlayback(); }catch(e){}
     try{ if(UI.playtest) edStopPlaytest(); }catch(e){}
     try{ closeWinAction(); }catch(e){}
+    /* 2.4.49（用户第 1 条）：从「编辑关卡/编辑盒子」直接回主菜单时也**自动保存**一次
+       —— 这条路径不经过 `edShow('main')`，不补的话主界面上做的改动会丢 ✓ */
+    try{ if(ED.screen==='main'||ED.screen==='space'){ ED.draft=null; edAutoSave(); } }catch(e){}
     showStartScreen();
   });
   bindClick('boot-retry',()=>{ try{ location.reload(); }catch(e){} });
